@@ -77,7 +77,12 @@ export default function HistoryView({ clothes, wearHistory, loading }: HistoryVi
       days.push(i);
     }
     
-    return days;
+    // 42セル（6行×7列）になるまで埋める
+    while (days.length < 42) {
+      days.push(null);
+    }
+    
+    return days.slice(0, 42);
   };
 
   const isToday = (day: number) => {
@@ -116,8 +121,8 @@ export default function HistoryView({ clothes, wearHistory, loading }: HistoryVi
 
   return (
     <>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold">着用履歴</h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-base font-bold">着用履歴</h2>
         
         <div className="flex bg-zinc-900 rounded-lg p-1">
           <button
@@ -144,8 +149,9 @@ export default function HistoryView({ clothes, wearHistory, loading }: HistoryVi
       </div>
 
       {viewMode === 'calendar' ? (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 180px)', maxHeight: '520px' }}>
+          {/* ヘッダー */}
+          <div className="flex items-center justify-between px-2 py-1.5 border-b border-zinc-800 flex-shrink-0">
             <button
               onClick={prevMonth}
               className="p-1 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded transition-colors"
@@ -173,7 +179,8 @@ export default function HistoryView({ clothes, wearHistory, loading }: HistoryVi
             </button>
           </div>
 
-          <div className="grid grid-cols-7 border-b border-zinc-800">
+          {/* 曜日ヘッダー */}
+          <div className="grid grid-cols-7 border-b border-zinc-800 flex-shrink-0">
             {dayNames.map((day, i) => (
               <div
                 key={day}
@@ -186,10 +193,11 @@ export default function HistoryView({ clothes, wearHistory, loading }: HistoryVi
             ))}
           </div>
 
-          <div className="grid grid-cols-7">
+          {/* カレンダー本体 - 6行固定 */}
+          <div className="grid grid-cols-7 grid-rows-6 flex-1">
             {generateCalendarDays().map((day, index) => {
               if (day === null) {
-                return <div key={`empty-${index}`} className="h-16 sm:h-20 border-b border-r border-zinc-800/50" />;
+                return <div key={`empty-${index}`} className="border-b border-r border-zinc-800/50" />;
               }
 
               const dateString = formatDateString(getYear(), getMonth(), day);
@@ -199,14 +207,14 @@ export default function HistoryView({ clothes, wearHistory, loading }: HistoryVi
 
               return (
                 <div
-                  key={day}
+                  key={`day-${day}`}
                   onClick={() => hasRecords && setSelectedDate(dateString)}
-                  className={`h-16 sm:h-20 border-b border-r border-zinc-800/50 p-1 ${
+                  className={`border-b border-r border-zinc-800/50 p-0.5 overflow-hidden flex flex-col ${
                     isToday(day) ? 'bg-emerald-500/10' : ''
                   } ${hasRecords ? 'cursor-pointer hover:bg-zinc-800/50' : ''}`}
                 >
                   <div
-                    className={`text-[10px] sm:text-xs mb-1 ${
+                    className={`text-[9px] leading-none mb-0.5 flex-shrink-0 ${
                       isToday(day)
                         ? 'text-emerald-400 font-bold'
                         : dayOfWeek === 0
@@ -219,44 +227,55 @@ export default function HistoryView({ clothes, wearHistory, loading }: HistoryVi
                     {day}
                   </div>
                   
-                  <div className="flex flex-wrap gap-1">
-                    {records.slice(0, 4).map((record) => {
-                      const item = clothes.find(c => c.id === record.clothing_id);
-                      if (!item) return null;
-                      const category = getCategoryInfo(item.category);
-                      
-                      return (
-                        <div
-                          key={record.id}
-                          className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-zinc-800 overflow-hidden flex-shrink-0"
-                          title={item.name}
-                        >
-                          {item.image_url ? (
-                            <img
-                              src={item.image_url}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xs">
-                              {category.icon}
+                  {/* 服アイコン - グリッドで2x2まで表示 */}
+                  {records.length > 0 && (
+                    <div className="grid grid-cols-2 gap-0.5 flex-1 min-h-0">
+                      {records.slice(0, 4).map((record, i) => {
+                        const item = clothes.find(c => c.id === record.clothing_id);
+                        if (!item) return null;
+                        const category = getCategoryInfo(item.category);
+                        
+                        // 4つ目で他にもある場合は+N表示
+                        if (i === 3 && records.length > 4) {
+                          return (
+                            <div
+                              key="more"
+                              className="aspect-square rounded bg-zinc-700 flex items-center justify-center text-[7px] text-zinc-300 max-h-6"
+                            >
+                              +{records.length - 3}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {records.length > 4 && (
-                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400">
-                        +{records.length - 4}
-                      </div>
-                    )}
-                  </div>
+                          );
+                        }
+                        
+                        return (
+                          <div
+                            key={record.id}
+                            className="aspect-square rounded bg-zinc-800 overflow-hidden max-h-6"
+                            title={item.name}
+                          >
+                            {item.image_url ? (
+                              <img
+                                src={item.image_url}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[8px]">
+                                {category.icon}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-900/50">
+          {/* 今月の統計 */}
+          <div className="px-2 py-1.5 border-t border-zinc-800 bg-zinc-900/50 flex-shrink-0">
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-500">今月の着用回数</span>
               <span className="font-bold text-emerald-400">
@@ -269,7 +288,7 @@ export default function HistoryView({ clothes, wearHistory, loading }: HistoryVi
           </div>
         </div>
       ) : (
-        /* リスト表示 - 日付ごとにグループ化 */
+        /* リスト表示 */
         <div className="space-y-3">
           {sortedDates.map((date) => {
             const records = groupedHistory[date];

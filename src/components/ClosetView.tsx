@@ -45,7 +45,7 @@ export default function ClosetView({
   loading,
 }: ClosetViewProps) {
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [gridSize, setGridSize] = useState<GridSize>('medium');
+  const [gridSize, setGridSize] = useState<GridSize>('small');
   const {
     getLastWornDate,
     getDaysAgo,
@@ -203,7 +203,7 @@ export default function ClosetView({
           )}
         </div>
       ) : (
-        <div className={`grid gap-3 ${gridConfig[gridSize].className}`}>
+        <div className={`grid gap-2 ${gridConfig[gridSize].className}`}>
           {filteredClothes.map((item) => {
             const lastWorn = getLastWornDate(item.id);
             const days = getDaysAgo(lastWorn);
