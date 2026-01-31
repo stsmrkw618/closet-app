@@ -6,6 +6,16 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+export type CategoryId = 
+  | 'tshirt' 
+  | 'shirt' 
+  | 'sweater' 
+  | 'jacket' 
+  | 'pants' 
+  | 'shorts' 
+  | 'shoes'
+  | 'other';
+
 export interface Database {
   public: {
     Tables: {
