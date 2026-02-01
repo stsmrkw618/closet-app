@@ -6,16 +6,6 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type CategoryId = 
-  | 'tshirt' 
-  | 'shirt' 
-  | 'sweater' 
-  | 'jacket' 
-  | 'pants' 
-  | 'shorts' 
-  | 'shoes'
-  | 'other';
-
 export interface Database {
   public: {
     Tables: {
@@ -71,6 +61,29 @@ export interface Database {
           user_id?: string
           clothing_id?: string
           date?: string
+          created_at?: string
+        }
+      }
+      refresh_history: {
+        Row: {
+          id: string
+          user_id: string
+          clothing_id: string
+          refreshed_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          clothing_id: string
+          refreshed_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          clothing_id?: string
+          refreshed_at?: string
           created_at?: string
         }
       }

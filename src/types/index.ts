@@ -17,6 +17,14 @@ export interface WearRecord {
   created_at: string;
 }
 
+export interface RefreshRecord {
+  id: string;
+  user_id: string;
+  clothing_id: string;
+  refreshed_at: string; // ISO datetime
+  created_at: string;
+}
+
 export type CategoryId = 
   | 'tshirt' 
   | 'shirt' 
@@ -41,3 +49,6 @@ export interface User {
   id: string;
   email?: string;
 }
+
+// フレッシュネス（鮮度）のレベル
+export type FreshnessLevel = 'fresh' | 'moderate' | 'stale' | 'hidden';

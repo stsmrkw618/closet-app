@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { compressImage, generateFileName } from '@/lib/imageCompression';
-import { ClothingItem, WearRecord, CategoryId, Category } from '@/types';
+import { ClothingItem, WearRecord, RefreshRecord, CategoryId, Category, FreshnessLevel } from '@/types';
 import { useAuth } from './useAuth';
 
 export const CATEGORIES: Category[] = [
@@ -17,17 +17,40 @@ export const CATEGORIES: Category[] = [
   { id: 'other', label: 'その他', icon: '📦' },
 ];
 
+// ====================================
+// カテゴリ別フレッシュネス閾値設定
+// ====================================
+// null = バッジ非表示（フレッシュネス対象外）
+interface FreshnessThreshold {
+  moderate: number; // この回数以上で黄ドット
+  stale: number;    // この回数以上で赤ドット
+}
+
+const FRESHNESS_THRESHOLDS: Record<CategoryId, FreshnessThreshold | null> = {
+  tshirt:  { moderate: 1, stale: 4 },  // 緑:0回, 黄:1-3回, 赤:4回以上
+  shirt:   { moderate: 1, stale: 4 },
+  sweater: { moderate: 1, stale: 4 },
+  jacket:  null,                         // 非表示
+  pants:   { moderate: 1, stale: 8 },   // 緑:0回, 黄:1-7回, 赤:8回以上
+  shorts:  { moderate: 1, stale: 4 },
+  shoes:   null,                         // 非表示
+  other:   null,                         // 非表示
+};
+
 export function useCloset() {
   const { user } = useAuth();
   const [clothes, setClothes] = useState<ClothingItem[]>([]);
   const [wearHistory, setWearHistory] = useState<WearRecord[]>([]);
+  const [refreshHistory, setRefreshHistory] = useState<RefreshRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // データ取得
   const fetchData = useCallback(async () => {
     if (!user) {
       setClothes([]);
       setWearHistory([]);
+      setRefreshHistory([]);
       setLoading(false);
       return;
     }
@@ -36,24 +59,34 @@ export function useCloset() {
       setLoading(true);
       setError(null);
 
-      const { data: clothesData, error: clothesError } = await supabase
-        .from('clothes')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      const [clothesRes, historyRes, refreshRes] = await Promise.all([
+        supabase
+          .from('clothes')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('wear_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false }),
+        supabase
+          .from('refresh_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('refreshed_at', { ascending: false }),
+      ]);
 
-      if (clothesError) throw clothesError;
+      if (clothesRes.error) throw clothesRes.error;
+      if (historyRes.error) throw historyRes.error;
+      // refresh_historyテーブルが未作成でもエラーにしない
+      if (refreshRes.error && refreshRes.error.code !== '42P01') {
+        console.warn('refresh_history fetch warning:', refreshRes.error);
+      }
 
-      const { data: historyData, error: historyError } = await supabase
-        .from('wear_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false });
-
-      if (historyError) throw historyError;
-
-      setClothes((clothesData as ClothingItem[]) || []);
-      setWearHistory((historyData as WearRecord[]) || []);
+      setClothes((clothesRes.data as ClothingItem[]) || []);
+      setWearHistory((historyRes.data as WearRecord[]) || []);
+      setRefreshHistory((refreshRes.data as RefreshRecord[]) || []);
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('データの取得に失敗しました');
@@ -66,26 +99,24 @@ export function useCloset() {
     fetchData();
   }, [fetchData]);
 
+  // ====================================
+  // 画像アップロード/削除
+  // ====================================
   const uploadImage = async (file: File): Promise<string | null> => {
     if (!user) return null;
-
     try {
       const compressedFile = await compressImage(file);
       const fileName = generateFileName(user.id, file.name);
-
       const { error: uploadError } = await supabase.storage
         .from('clothing-images')
         .upload(fileName, compressedFile, {
           contentType: 'image/jpeg',
           upsert: false,
         });
-
       if (uploadError) throw uploadError;
-
       const { data: { publicUrl } } = supabase.storage
         .from('clothing-images')
         .getPublicUrl(fileName);
-
       return publicUrl;
     } catch (err) {
       console.error('Error uploading image:', err);
@@ -95,44 +126,33 @@ export function useCloset() {
 
   const deleteImage = async (imageUrl: string): Promise<void> => {
     if (!user || !imageUrl) return;
-
     try {
       const urlParts = imageUrl.split('/clothing-images/');
       if (urlParts.length < 2) return;
-      
       const filePath = urlParts[1];
-
       const { error } = await supabase.storage
         .from('clothing-images')
         .remove([filePath]);
-
-      if (error) {
-        console.error('Error deleting image:', error);
-      }
+      if (error) console.error('Error deleting image:', error);
     } catch (err) {
       console.error('Error deleting image:', err);
     }
   };
 
+  // ====================================
+  // 服の追加/削除
+  // ====================================
   const addItem = async (
-    item: {
-      name: string;
-      category: CategoryId;
-      color: string;
-      notes: string;
-    },
+    item: { name: string; category: CategoryId; color: string; notes: string },
     imageFile: File | null
   ): Promise<ClothingItem | null> => {
     if (!user) return null;
-
     try {
       setError(null);
-
       let imageUrl: string | null = null;
       if (imageFile) {
         imageUrl = await uploadImage(imageFile);
       }
-
       const { data, error: insertError } = await supabase
         .from('clothes')
         .insert({
@@ -145,9 +165,7 @@ export function useCloset() {
         })
         .select()
         .single();
-
       if (insertError) throw insertError;
-
       const newItem = data as ClothingItem;
       setClothes((prev) => [newItem, ...prev]);
       return newItem;
@@ -158,70 +176,28 @@ export function useCloset() {
     }
   };
 
-  const updateItem = async (
-    id: string,
-    updates: {
-      name?: string;
-      category?: CategoryId;
-      color?: string | null;
-      notes?: string | null;
-    }
-  ): Promise<ClothingItem | null> => {
-    if (!user) return null;
-
-    try {
-      setError(null);
-
-      const { data, error: updateError } = await supabase
-        .from('clothes')
-        .update(updates)
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
-
-      const updatedItem = data as ClothingItem;
-      setClothes((prev) =>
-        prev.map((c) => (c.id === id ? updatedItem : c))
-      );
-      return updatedItem;
-    } catch (err) {
-      console.error('Error updating item:', err);
-      setError('服の更新に失敗しました');
-      return null;
-    }
-  };
-
   const deleteItem = async (id: string): Promise<boolean> => {
     if (!user) return false;
-
     try {
       setError(null);
-
       const item = clothes.find((c) => c.id === id);
-      
       const { error: deleteError } = await supabase
         .from('clothes')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
-
       if (deleteError) throw deleteError;
-
       if (item?.image_url) {
         await deleteImage(item.image_url);
       }
-
-      await supabase
-        .from('wear_history')
-        .delete()
-        .eq('clothing_id', id)
-        .eq('user_id', user.id);
-
+      // 着用履歴・リフレッシュ履歴も削除
+      await Promise.all([
+        supabase.from('wear_history').delete().eq('clothing_id', id).eq('user_id', user.id),
+        supabase.from('refresh_history').delete().eq('clothing_id', id).eq('user_id', user.id),
+      ]);
       setClothes((prev) => prev.filter((c) => c.id !== id));
       setWearHistory((prev) => prev.filter((h) => h.clothing_id !== id));
+      setRefreshHistory((prev) => prev.filter((r) => r.clothing_id !== id));
       return true;
     } catch (err) {
       console.error('Error deleting item:', err);
@@ -230,34 +206,24 @@ export function useCloset() {
     }
   };
 
+  // ====================================
+  // 着用記録
+  // ====================================
   const wearToday = async (clothingId: string): Promise<boolean> => {
-    const today = new Date().toISOString().split('T')[0];
-    return wearOnDate(clothingId, today);
-  };
-
-  const wearOnDate = async (clothingId: string, date: string): Promise<boolean> => {
     if (!user) return false;
-
+    const today = new Date().toISOString().split('T')[0];
     const existing = wearHistory.find(
-      (h) => h.clothing_id === clothingId && h.date === date
+      (h) => h.clothing_id === clothingId && h.date === today
     );
     if (existing) return true;
-
     try {
       setError(null);
-
       const { data, error: insertError } = await supabase
         .from('wear_history')
-        .insert({
-          user_id: user.id,
-          clothing_id: clothingId,
-          date: date,
-        })
+        .insert({ user_id: user.id, clothing_id: clothingId, date: today })
         .select()
         .single();
-
       if (insertError) throw insertError;
-
       setWearHistory((prev) => [data as WearRecord, ...prev]);
       return true;
     } catch (err) {
@@ -269,18 +235,14 @@ export function useCloset() {
 
   const removeWearRecord = async (recordId: string): Promise<boolean> => {
     if (!user) return false;
-
     try {
       setError(null);
-
       const { error: deleteError } = await supabase
         .from('wear_history')
         .delete()
         .eq('id', recordId)
         .eq('user_id', user.id);
-
       if (deleteError) throw deleteError;
-
       setWearHistory((prev) => prev.filter((h) => h.id !== recordId));
       return true;
     } catch (err) {
@@ -290,6 +252,74 @@ export function useCloset() {
     }
   };
 
+  // ====================================
+  // リフレッシュ（洗濯）記録
+  // ====================================
+  const refreshItem = async (clothingId: string): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      setError(null);
+      const { data, error: insertError } = await supabase
+        .from('refresh_history')
+        .insert({
+          user_id: user.id,
+          clothing_id: clothingId,
+          refreshed_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+      setRefreshHistory((prev) => [data as RefreshRecord, ...prev]);
+      return true;
+    } catch (err) {
+      console.error('Error recording refresh:', err);
+      setError('リフレッシュ記録の保存に失敗しました');
+      return false;
+    }
+  };
+
+  // 最後のリフレッシュ日時を取得
+  const getLastRefreshDate = (itemId: string): Date | null => {
+    const records = refreshHistory.filter((r) => r.clothing_id === itemId);
+    if (records.length === 0) return null;
+    return new Date(Math.max(...records.map((r) => new Date(r.refreshed_at).getTime())));
+  };
+
+  // リフレッシュ後の着用回数を計算
+  const getWearsSinceRefresh = (itemId: string): number => {
+    const lastRefresh = getLastRefreshDate(itemId);
+    if (!lastRefresh) {
+      // 一度もリフレッシュしていない → 全着用回数
+      return wearHistory.filter((h) => h.clothing_id === itemId).length;
+    }
+    const refreshDate = lastRefresh.toISOString().split('T')[0];
+    return wearHistory.filter(
+      (h) => h.clothing_id === itemId && h.date > refreshDate
+    ).length;
+  };
+
+  // フレッシュネスレベルを判定
+  const getFreshnessLevel = (itemId: string, category: CategoryId): FreshnessLevel => {
+    const threshold = FRESHNESS_THRESHOLDS[category];
+    if (!threshold) return 'hidden';
+
+    const wearsSinceRefresh = getWearsSinceRefresh(itemId);
+    if (wearsSinceRefresh < threshold.moderate) return 'fresh';
+    if (wearsSinceRefresh < threshold.stale) return 'moderate';
+    return 'stale';
+  };
+
+  // リフレッシュ待ちアイテム数を取得（吹き出し用）
+  const getStaleItemCount = (): number => {
+    return clothes.filter((item) => {
+      const level = getFreshnessLevel(item.id, item.category);
+      return level === 'stale';
+    }).length;
+  };
+
+  // ====================================
+  // ユーティリティ
+  // ====================================
   const getLastWornDate = (itemId: string): Date | null => {
     const records = wearHistory.filter((h) => h.clothing_id === itemId);
     if (records.length === 0) return null;
@@ -316,7 +346,7 @@ export function useCloset() {
   };
 
   const getCategoryInfo = (categoryId: CategoryId): Category => {
-    return CATEGORIES.find((c) => c.id === categoryId) || CATEGORIES[6];
+    return CATEGORIES.find((c) => c.id === categoryId) || CATEGORIES[7]; // 'other'
   };
 
   const getItemHistory = (itemId: string): WearRecord[] => {
@@ -328,14 +358,18 @@ export function useCloset() {
   return {
     clothes,
     wearHistory,
+    refreshHistory,
     loading,
     error,
     addItem,
-    updateItem,
     deleteItem,
     wearToday,
-    wearOnDate,
     removeWearRecord,
+    refreshItem,
+    getLastRefreshDate,
+    getWearsSinceRefresh,
+    getFreshnessLevel,
+    getStaleItemCount,
     getLastWornDate,
     getDaysAgo,
     getWearCount,

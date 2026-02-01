@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { Search, LogOut, Upload } from 'lucide-react';
 import { CategoryId, SortType } from '@/types';
-import { CATEGORIES } from '@/hooks/useCloset';
+import { CATEGORIES, useCloset } from '@/hooks/useCloset';
 import { useAuth } from '@/hooks/useAuth';
 
 interface HeaderProps {
@@ -17,9 +17,15 @@ interface HeaderProps {
   showFilters: boolean;
 }
 
-// 時間帯に応じた挨拶メッセージ
-function getGreeting(): string {
+// 時間帯に応じた挨拶 + リフレッシュ待ち件数
+function getGreeting(staleCount: number): string {
   const hour = new Date().getHours();
+
+  // リフレッシュ待ちがあればそちらを優先表示（時々）
+  if (staleCount > 0) {
+    return `${staleCount}着リフレッシュ待ちだよ🫧`;
+  }
+
   if (hour < 6) return 'こんな時間に何着る？🌙';
   if (hour < 11) return 'おはよう！今日は何着る？☀️';
   if (hour < 17) return '今日は何着る？👕';
@@ -38,6 +44,7 @@ export default function Header({
   showFilters,
 }: HeaderProps) {
   const { signOut } = useAuth();
+  const { getStaleItemCount } = useCloset();
   const [mascotImage, setMascotImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,6 +69,8 @@ export default function Header({
     };
     reader.readAsDataURL(file);
   };
+
+  const staleCount = getStaleItemCount();
 
   return (
     <header className="sticky top-0 z-40 bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800">
@@ -111,8 +120,7 @@ export default function Header({
 
           {/* 吹き出し */}
           <div className="relative bg-zinc-800/80 rounded-2xl rounded-bl-sm px-4 py-2 flex-1">
-            <span className="text-sm text-zinc-200">{getGreeting()}</span>
-            {/* 吹き出しの三角 */}
+            <span className="text-sm text-zinc-200">{getGreeting(staleCount)}</span>
             <div className="absolute left-0 bottom-1 -translate-x-1 w-0 h-0 border-t-[6px] border-t-transparent border-r-[8px] border-r-zinc-800/80 border-b-[6px] border-b-transparent" />
           </div>
         </div>

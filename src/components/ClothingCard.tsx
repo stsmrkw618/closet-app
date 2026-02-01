@@ -1,7 +1,7 @@
 'use client';
 
 import { Check } from 'lucide-react';
-import { ClothingItem, Category } from '@/types';
+import { ClothingItem, Category, FreshnessLevel } from '@/types';
 
 interface ClothingCardProps {
   item: ClothingItem;
@@ -10,6 +10,7 @@ interface ClothingCardProps {
   daysAgo: number;
   wearCount: number;
   isWornToday: boolean;
+  freshnessLevel: FreshnessLevel;
   onSelect: () => void;
   onWearToday: () => void;
   compact?: boolean;
@@ -23,6 +24,13 @@ function getDaysColor(days: number): string {
   return 'text-emerald-400';
 }
 
+const FRESHNESS_DOT_STYLES: Record<FreshnessLevel, string> = {
+  fresh: 'bg-emerald-400',
+  moderate: 'bg-amber-400',
+  stale: 'bg-red-400',
+  hidden: '',
+};
+
 export default function ClothingCard({
   item,
   category,
@@ -30,6 +38,7 @@ export default function ClothingCard({
   daysAgo,
   wearCount,
   isWornToday,
+  freshnessLevel,
   onSelect,
   onWearToday,
   compact = false,
@@ -54,7 +63,7 @@ export default function ClothingCard({
           </div>
         )}
 
-        {/* Days Badge */}
+        {/* Days Badge - 右上 */}
         <div
           className={`absolute top-1 right-1 px-1.5 py-0.5 rounded-full font-medium bg-zinc-950/80 ${getDaysColor(daysAgo)} ${
             compact ? 'text-[8px]' : 'text-[10px]'
@@ -63,13 +72,22 @@ export default function ClothingCard({
           {lastWornText}
         </div>
 
-        {/* Today Worn Badge */}
+        {/* Today Worn Badge - 左上 */}
         {isWornToday && (
           <div className={`absolute top-1 left-1 bg-emerald-500 text-zinc-950 px-1.5 py-0.5 rounded-full font-medium ${
             compact ? 'text-[8px]' : 'text-[10px]'
           }`}>
             ✓
           </div>
+        )}
+
+        {/* Freshness Dot - 左下（さりげなく） */}
+        {freshnessLevel !== 'hidden' && (
+          <div
+            className={`absolute bottom-1.5 left-1.5 rounded-full ${FRESHNESS_DOT_STYLES[freshnessLevel]} ${
+              compact ? 'w-2 h-2' : 'w-2.5 h-2.5'
+            }`}
+          />
         )}
       </div>
 

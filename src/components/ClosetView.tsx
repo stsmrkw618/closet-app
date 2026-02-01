@@ -53,6 +53,7 @@ export default function ClosetView({
     isWornToday,
     getCategoryInfo,
     wearToday,
+    getFreshnessLevel,
   } = useCloset();
 
   const getFilteredClothes = () => {
@@ -142,7 +143,6 @@ export default function ClosetView({
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-zinc-500">{filteredClothes.length}件</span>
-          {/* グリッドサイズ切替ボタン */}
           <div className="flex items-center bg-zinc-900 rounded-lg p-0.5 border border-zinc-800">
             <button
               onClick={() => setGridSize('medium')}
@@ -208,6 +208,7 @@ export default function ClosetView({
                 daysAgo={days}
                 wearCount={getWearCount(item.id)}
                 isWornToday={isWornToday(item.id)}
+                freshnessLevel={getFreshnessLevel(item.id, item.category)}
                 onSelect={() => onSelectItem(item)}
                 onWearToday={() => wearToday(item.id)}
                 compact={gridSize === 'xsmall'}

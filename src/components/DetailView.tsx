@@ -1,15 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, Calendar, Trash2, X, Loader2, Edit2, Check, Plus } from 'lucide-react';
-import { ClothingItem, CategoryId } from '@/types';
-import { useCloset, CATEGORIES } from '@/hooks/useCloset';
+import { Clock, Calendar, Trash2, X, Loader2, Sparkles } from 'lucide-react';
+import { ClothingItem, FreshnessLevel } from '@/types';
+import { useCloset } from '@/hooks/useCloset';
 
 interface DetailViewProps {
   item: ClothingItem;
   onBack: () => void;
   onDelete: () => Promise<void>;
-  onUpdate: (updatedItem: ClothingItem) => void;
 }
 
 function formatDate(date: Date | null): string {
@@ -35,20 +34,17 @@ function getDaysColor(days: number): string {
   return 'text-emerald-400';
 }
 
-export default function DetailView({ item, onBack, onDelete, onUpdate }: DetailViewProps) {
+const FRESHNESS_LABELS: Record<Exclude<FreshnessLevel, 'hidden'>, { label: string; color: string; bgColor: string }> = {
+  fresh: { label: 'フレッシュ', color: 'text-emerald-400', bgColor: 'bg-emerald-500/20' },
+  moderate: { label: 'そろそろ', color: 'text-amber-400', bgColor: 'bg-amber-500/20' },
+  stale: { label: 'リフレッシュ推奨', color: 'text-red-400', bgColor: 'bg-red-500/20' },
+};
+
+export default function DetailView({ item, onBack, onDelete }: DetailViewProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isWearing, setIsWearing] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  
-  // 編集用の状態
-  const [editName, setEditName] = useState(item.name);
-  const [editCategory, setEditCategory] = useState<CategoryId>(item.category);
-  const [editColor, setEditColor] = useState(item.color || '');
-  const [editNotes, setEditNotes] = useState(item.notes || '');
-  const [isSaving, setIsSaving] = useState(false);
-  
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const {
     getLastWornDate,
     getDaysAgo,
@@ -56,9 +52,11 @@ export default function DetailView({ item, onBack, onDelete, onUpdate }: DetailV
     getCategoryInfo,
     getItemHistory,
     wearToday,
-    wearOnDate,
     removeWearRecord,
-    updateItem,
+    refreshItem,
+    getLastRefreshDate,
+    getWearsSinceRefresh,
+    getFreshnessLevel,
   } = useCloset();
 
   const category = getCategoryInfo(item.category);
@@ -66,6 +64,9 @@ export default function DetailView({ item, onBack, onDelete, onUpdate }: DetailV
   const daysAgo = getDaysAgo(lastWorn);
   const wearCount = getWearCount(item.id);
   const history = getItemHistory(item.id);
+  const freshnessLevel = getFreshnessLevel(item.id, item.category);
+  const wearsSinceRefresh = getWearsSinceRefresh(item.id);
+  const lastRefresh = getLastRefreshDate(item.id);
 
   const handleDelete = async () => {
     if (confirm('この服を削除しますか？')) {
@@ -80,38 +81,18 @@ export default function DetailView({ item, onBack, onDelete, onUpdate }: DetailV
     setIsWearing(false);
   };
 
-  const handleWearOnDate = async () => {
-    if (!selectedDate) return;
-    setIsWearing(true);
-    await wearOnDate(item.id, selectedDate);
-    setShowDatePicker(false);
-    setIsWearing(false);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshItem(item.id);
+    setIsRefreshing(false);
   };
 
-  const handleSaveEdit = async () => {
-    if (!editName.trim()) return;
-    
-    setIsSaving(true);
-    const updated = await updateItem(item.id, {
-      name: editName,
-      category: editCategory,
-      color: editColor || null,
-      notes: editNotes || null,
-    });
-    
-    if (updated) {
-      onUpdate(updated);
-    }
-    setIsSaving(false);
-    setIsEditing(false);
-  };
-
-  const handleCancelEdit = () => {
-    setEditName(item.name);
-    setEditCategory(item.category);
-    setEditColor(item.color || '');
-    setEditNotes(item.notes || '');
-    setIsEditing(false);
+  const formatRefreshDate = (date: Date | null): string => {
+    if (!date) return '記録なし';
+    const y = date.getFullYear();
+    const m = date.getMonth() + 1;
+    const d = date.getDate();
+    return `${y}/${m}/${d}`;
   };
 
   return (
@@ -123,9 +104,9 @@ export default function DetailView({ item, onBack, onDelete, onUpdate }: DetailV
         ← 戻る
       </button>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Image */}
-        <div className="aspect-square bg-zinc-900 rounded-xl overflow-hidden max-h-64 mx-auto">
+        <div className="aspect-square bg-zinc-900 rounded-xl overflow-hidden">
           {item.image_url ? (
             <img
               src={item.image_url}
@@ -140,221 +121,148 @@ export default function DetailView({ item, onBack, onDelete, onUpdate }: DetailV
         </div>
 
         {/* Info */}
-        {isEditing ? (
-          /* 編集モード */
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">名前</label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">カテゴリ</label>
-              <div className="grid grid-cols-3 gap-1">
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setEditCategory(cat.id)}
-                    className={`px-2 py-1.5 rounded text-xs transition-all ${
-                      editCategory === cat.id
-                        ? 'bg-emerald-500 text-zinc-950 font-medium'
-                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                    }`}
-                  >
-                    {cat.icon} {cat.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">色</label>
-              <input
-                type="text"
-                value={editColor}
-                onChange={(e) => setEditColor(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">メモ</label>
-              <textarea
-                value={editNotes}
-                onChange={(e) => setEditNotes(e.target.value)}
-                rows={2}
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 resize-none"
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              <button
-                onClick={handleCancelEdit}
-                className="flex-1 bg-zinc-800 text-zinc-300 py-2 rounded-lg text-sm hover:bg-zinc-700"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                disabled={isSaving || !editName.trim()}
-                className="flex-1 bg-emerald-500 text-zinc-950 py-2 rounded-lg text-sm font-bold hover:bg-emerald-400 disabled:opacity-50 flex items-center justify-center gap-1"
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                保存
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* 表示モード */
-          <div>
-            <div className="flex items-start justify-between mb-2">
-              <h2 className="text-xl font-bold">{item.name}</h2>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="p-2 text-zinc-400 hover:text-emerald-400 transition-colors"
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2 mb-3">
-              <span className="bg-zinc-800 px-2 py-0.5 rounded-full text-xs">
-                {category.label}
+        <div>
+          <h2 className="text-xl font-bold mb-2">{item.name}</h2>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className="bg-zinc-800 px-3 py-1 rounded-full text-xs">
+              {category.label}
+            </span>
+            {item.color && (
+              <span className="bg-zinc-800 px-3 py-1 rounded-full text-xs">
+                {item.color}
               </span>
-              {item.color && (
-                <span className="bg-zinc-800 px-2 py-0.5 rounded-full text-xs">
-                  {item.color}
-                </span>
-              )}
-            </div>
-
-            {item.notes && (
-              <p className="text-sm text-zinc-400 bg-zinc-900 rounded-lg p-2 mb-3">
-                {item.notes}
-              </p>
             )}
           </div>
-        )}
+
+          {item.notes && (
+            <p className="text-sm text-zinc-400 bg-zinc-900 rounded-lg p-3 mb-4">
+              {item.notes}
+            </p>
+          )}
+        </div>
 
         {/* Stats */}
-        {!isEditing && (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
-              <div className="flex items-center gap-1 text-zinc-500 text-[10px] mb-0.5">
-                <Clock className="w-3 h-3" />
-                最後に着た日
-              </div>
-              <div className={`text-base font-bold ${getDaysColor(daysAgo)}`}>
-                {formatDate(lastWorn)}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+            <div className="flex items-center gap-2 text-zinc-500 text-xs mb-1">
+              <Clock className="w-3.5 h-3.5" />
+              最後に着た日
+            </div>
+            <div className={`text-lg font-bold ${getDaysColor(daysAgo)}`}>
+              {formatDate(lastWorn)}
+            </div>
+          </div>
+          <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
+            <div className="flex items-center gap-2 text-zinc-500 text-xs mb-1">
+              <Calendar className="w-3.5 h-3.5" />
+              着用回数
+            </div>
+            <div className="text-lg font-bold">{wearCount}回</div>
+          </div>
+        </div>
+
+        {/* Freshness Section（対象カテゴリのみ表示） */}
+        {freshnessLevel !== 'hidden' && (
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+            <div className="px-4 py-3 border-b border-zinc-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-zinc-400" />
+                  <span className="text-sm font-medium">フレッシュネス</span>
+                </div>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${FRESHNESS_LABELS[freshnessLevel].bgColor} ${FRESHNESS_LABELS[freshnessLevel].color}`}>
+                  {FRESHNESS_LABELS[freshnessLevel].label}
+                </span>
               </div>
             </div>
-            <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
-              <div className="flex items-center gap-1 text-zinc-500 text-[10px] mb-0.5">
-                <Calendar className="w-3 h-3" />
-                着用回数
+
+            <div className="px-4 py-3 space-y-3">
+              {/* リフレッシュ後の着用回数 */}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-zinc-400">リフレッシュ後</span>
+                <span className={`font-bold ${FRESHNESS_LABELS[freshnessLevel].color}`}>
+                  {wearsSinceRefresh}回着用
+                </span>
               </div>
-              <div className="text-base font-bold">{wearCount}回</div>
+
+              {/* 前回のリフレッシュ日 */}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-zinc-400">前回リフレッシュ</span>
+                <span className="text-zinc-300 text-xs">
+                  {formatRefreshDate(lastRefresh)}
+                </span>
+              </div>
+
+              {/* リフレッシュボタン */}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isRefreshing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    リフレッシュする
+                  </>
+                )}
+              </button>
             </div>
           </div>
         )}
 
         {/* Recent History */}
-        {!isEditing && (
-          <div>
-            <h3 className="text-xs font-medium mb-1.5">最近の着用</h3>
-            <div className="space-y-1 max-h-24 overflow-y-auto">
-              {history.slice(0, 5).map((record) => (
-                <div
-                  key={record.id}
-                  className="flex items-center justify-between bg-zinc-900 rounded px-2 py-1.5 text-xs"
+        <div>
+          <h3 className="text-sm font-medium mb-2">最近の着用</h3>
+          <div className="space-y-1">
+            {history.slice(0, 5).map((record) => (
+              <div
+                key={record.id}
+                className="flex items-center justify-between bg-zinc-900 rounded-lg px-3 py-2 text-sm"
+              >
+                <span className="text-zinc-400">{record.date}</span>
+                <button
+                  onClick={() => removeWearRecord(record.id)}
+                  className="text-zinc-600 hover:text-red-400"
                 >
-                  <span className="text-zinc-400">{record.date}</span>
-                  <button
-                    onClick={() => removeWearRecord(record.id)}
-                    className="text-zinc-600 hover:text-red-400"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              {history.length === 0 && (
-                <p className="text-zinc-600 text-xs py-1">
-                  まだ着用記録がありません
-                </p>
-              )}
-            </div>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+            {history.length === 0 && (
+              <p className="text-zinc-600 text-sm py-2">
+                まだ着用記録がありません
+              </p>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Actions */}
-        {!isEditing && (
-          <div className="space-y-2">
-            {/* 日付選択 */}
-            {showDatePicker && (
-              <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
-                <label className="block text-xs text-zinc-400 mb-1">着用日を選択</label>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    max={new Date().toISOString().split('T')[0]}
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-emerald-500"
-                  />
-                  <button
-                    onClick={handleWearOnDate}
-                    disabled={isWearing}
-                    className="bg-emerald-500 text-zinc-950 px-3 py-1.5 rounded text-sm font-bold hover:bg-emerald-400 disabled:opacity-50"
-                  >
-                    {isWearing ? <Loader2 className="w-4 h-4 animate-spin" /> : '登録'}
-                  </button>
-                  <button
-                    onClick={() => setShowDatePicker(false)}
-                    className="bg-zinc-800 text-zinc-400 px-2 py-1.5 rounded text-sm hover:bg-zinc-700"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleWearToday}
+            disabled={isWearing}
+            className="flex-1 bg-emerald-500 text-zinc-950 py-3 rounded-xl font-bold text-sm hover:bg-emerald-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isWearing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              '今日着る'
             )}
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleWearToday}
-                disabled={isWearing}
-                className="flex-1 bg-emerald-500 text-zinc-950 py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isWearing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  '今日着る'
-                )}
-              </button>
-              <button
-                onClick={() => setShowDatePicker(!showDatePicker)}
-                className="p-2.5 bg-zinc-800 text-zinc-300 rounded-xl hover:bg-zinc-700 transition-colors"
-                title="過去の日付を登録"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="p-2.5 bg-zinc-900 text-red-400 rounded-xl hover:bg-red-500/20 transition-colors disabled:opacity-50"
-              >
-                {isDeleting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Trash2 className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-          </div>
-        )}
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="p-3 bg-zinc-900 text-red-400 rounded-xl hover:bg-red-500/20 transition-colors disabled:opacity-50"
+          >
+            {isDeleting ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Trash2 className="w-5 h-5" />
+            )}
+          </button>
+        </div>
       </div>
     </>
   );
