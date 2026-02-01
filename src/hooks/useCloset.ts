@@ -452,12 +452,11 @@ export function useCloset() {
     return streak;
   };
 
-  // ストリークからレベルを計算
+  // ストリークからレベルを計算（1日ごとに+1レベル）
   const getLevel = (): number => {
     const streak = getCurrentStreak();
-    if (streak === 0) return 1;
-    // 7日ごとにレベルアップ、最低1
-    return Math.max(1, Math.floor(streak / 7) + 1);
+    // 連続記録日数 = レベル（最低1）
+    return Math.max(1, streak);
   };
 
   return {
