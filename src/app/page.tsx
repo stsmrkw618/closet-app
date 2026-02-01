@@ -65,10 +65,6 @@ export default function Home() {
     }
   };
 
-  const handleUpdateItem = (updatedItem: ClothingItem) => {
-    setSelectedItem(updatedItem);
-  };
-
   const handleNavigate = (newView: ViewType) => {
     setView(newView);
     if (newView !== 'detail') {
@@ -129,7 +125,6 @@ export default function Home() {
               setView('closet');
             }}
             onDelete={handleDeleteItem}
-            onUpdate={handleUpdateItem}
           />
         )}
       </main>
