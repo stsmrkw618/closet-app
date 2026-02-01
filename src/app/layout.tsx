@@ -9,6 +9,15 @@ export const metadata: Metadata = {
   title: 'My Closet - クローゼット管理アプリ',
   description: '服の着用履歴を管理して、眠っている服を発見しよう',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'My Closet',
+  },
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon-192.png',
+  },
 };
 
 export const viewport: Viewport = {
