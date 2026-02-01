@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { SortDesc, ChevronDown, Shirt, Loader2, Grid2X2, Grid3X3, LayoutGrid } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { SortDesc, ChevronDown, Shirt, Loader2, Grid2X2, Grid3X3, LayoutGrid, Sparkles } from 'lucide-react';
 import { ClothingItem, CategoryId, SortType } from '@/types';
 import { useCloset } from '@/hooks/useCloset';
 import ClothingCard from './ClothingCard';
@@ -46,6 +46,26 @@ export default function ClosetView({
 }: ClosetViewProps) {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [gridSize, setGridSize] = useState<GridSize>('small');
+  const [showFreshness, setShowFreshness] = useState(true);
+
+  // LocalStorageからフレッシュネス表示設定を復元
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('show-freshness');
+      if (saved !== null) {
+        setShowFreshness(saved === 'true');
+      }
+    } catch {}
+  }, []);
+
+  const toggleFreshness = () => {
+    const newValue = !showFreshness;
+    setShowFreshness(newValue);
+    try {
+      localStorage.setItem('show-freshness', String(newValue));
+    } catch {}
+  };
+
   const {
     getLastWornDate,
     getDaysAgo,
@@ -143,6 +163,21 @@ export default function ClosetView({
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-zinc-500">{filteredClothes.length}件</span>
+
+          {/* Freshness Toggle */}
+          <button
+            onClick={toggleFreshness}
+            className={`p-1.5 rounded-lg border transition-colors ${
+              showFreshness
+                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+            }`}
+            title={showFreshness ? 'リフレッシュマーク非表示' : 'リフレッシュマーク表示'}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Grid Size Toggle */}
           <div className="flex items-center bg-zinc-900 rounded-lg p-0.5 border border-zinc-800">
             <button
               onClick={() => setGridSize('medium')}
@@ -209,6 +244,7 @@ export default function ClosetView({
                 wearCount={getWearCount(item.id)}
                 isWornToday={isWornToday(item.id)}
                 freshnessLevel={getFreshnessLevel(item.id, item.category)}
+                showFreshness={showFreshness}
                 onSelect={() => onSelectItem(item)}
                 onWearToday={() => wearToday(item.id)}
                 compact={gridSize === 'xsmall'}

@@ -11,6 +11,7 @@ interface ClothingCardProps {
   wearCount: number;
   isWornToday: boolean;
   freshnessLevel: FreshnessLevel;
+  showFreshness: boolean;
   onSelect: () => void;
   onWearToday: () => void;
   compact?: boolean;
@@ -39,6 +40,7 @@ export default function ClothingCard({
   wearCount,
   isWornToday,
   freshnessLevel,
+  showFreshness,
   onSelect,
   onWearToday,
   compact = false,
@@ -82,16 +84,12 @@ export default function ClothingCard({
         )}
 
         {/* Freshness Dot - 左下（さりげなく） */}
-        {freshnessLevel !== 'hidden' ? (
+        {showFreshness && freshnessLevel !== 'hidden' && (
           <div
             className={`absolute bottom-1.5 left-1.5 rounded-full border border-zinc-950/50 shadow-sm ${FRESHNESS_DOT_STYLES[freshnessLevel]} ${
               compact ? 'w-2.5 h-2.5' : 'w-3 h-3'
             }`}
           />
-        ) : (
-          <div className="absolute bottom-1 left-1 bg-zinc-950/80 px-1 rounded text-[8px] text-zinc-400">
-            {String(freshnessLevel)}
-          </div>
         )}
       </div>
 
