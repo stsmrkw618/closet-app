@@ -1,6 +1,6 @@
 'use client';
 
-import { Shirt, Plus, Calendar } from 'lucide-react';
+import { Shirt, Plus, Calendar, Trophy } from 'lucide-react';
 import { ViewType } from '@/types';
 
 interface BottomNavProps {
@@ -12,9 +12,9 @@ export default function BottomNav({ currentView, onNavigate }: BottomNavProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800 z-50">
       <div className="relative max-w-md mx-auto px-4 py-3">
-        {/* 3カラムグリッドで完全中央配置 */}
-        <div className="grid grid-cols-3 items-center">
-          {/* 左: クローゼット */}
+        {/* 5カラムグリッドで完全中央配置 */}
+        <div className="grid grid-cols-5 items-center">
+          {/* クローゼット */}
           <button
             onClick={() => onNavigate('closet')}
             className={`flex flex-col items-center gap-1 py-1 transition-colors ${
@@ -27,6 +27,19 @@ export default function BottomNav({ currentView, onNavigate }: BottomNavProps) {
             <span className="text-[10px]">クローゼット</span>
           </button>
 
+          {/* ランキング */}
+          <button
+            onClick={() => onNavigate('ranking')}
+            className={`flex flex-col items-center gap-1 py-1 transition-colors ${
+              currentView === 'ranking'
+                ? 'text-emerald-400'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Trophy className="w-5 h-5" />
+            <span className="text-[10px]">ランキング</span>
+          </button>
+
           {/* 中央: ＋ボタン */}
           <div className="flex justify-center">
             <button
@@ -37,7 +50,7 @@ export default function BottomNav({ currentView, onNavigate }: BottomNavProps) {
             </button>
           </div>
 
-          {/* 右: カレンダー */}
+          {/* カレンダー */}
           <button
             onClick={() => onNavigate('history')}
             className={`flex flex-col items-center gap-1 py-1 transition-colors ${
@@ -49,6 +62,9 @@ export default function BottomNav({ currentView, onNavigate }: BottomNavProps) {
             <Calendar className="w-5 h-5" />
             <span className="text-[10px]">カレンダー</span>
           </button>
+
+          {/* 空きスペース（バランス用） */}
+          <div />
         </div>
       </div>
     </nav>

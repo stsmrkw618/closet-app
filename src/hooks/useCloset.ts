@@ -152,7 +152,14 @@ export function useCloset() {
   // 服の追加/削除
   // ====================================
   const addItem = async (
-    item: { name: string; category: CategoryId; color: string; notes: string },
+    item: {
+      name: string;
+      category: CategoryId;
+      color: string;
+      notes: string;
+      acquired_date?: string;
+      price?: number | null;
+    },
     imageFile: File | null
   ): Promise<ClothingItem | null> => {
     if (!user) return null;
@@ -171,6 +178,8 @@ export function useCloset() {
           color: item.color || null,
           image_url: imageUrl,
           notes: item.notes || null,
+          acquired_date: item.acquired_date || null,
+          price: item.price ?? null,
         })
         .select()
         .single();
@@ -366,6 +375,91 @@ export function useCloset() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   };
 
+  // 服の情報を更新
+  const updateItem = async (
+    id: string,
+    updates: {
+      name?: string;
+      category?: CategoryId;
+      color?: string | null;
+      notes?: string | null;
+      acquired_date?: string | null;
+      price?: number | null;
+    }
+  ): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      setError(null);
+      const { error: updateError } = await supabase
+        .from('clothes')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (updateError) throw updateError;
+      setClothes((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
+      );
+      return true;
+    } catch (err) {
+      console.error('Error updating item:', err);
+      setError('服の更新に失敗しました');
+      return false;
+    }
+  };
+
+  // 指定期間内の着用回数を取得
+  const getWearCountInRange = (itemId: string, startDate?: string, endDate?: string): number => {
+    return wearHistory.filter((h) => {
+      if (h.clothing_id !== itemId) return false;
+      if (startDate && h.date < startDate) return false;
+      if (endDate && h.date > endDate) return false;
+      return true;
+    }).length;
+  };
+
+  // 連続記録日数（現在のストリーク）を計算
+  const getCurrentStreak = (): number => {
+    if (wearHistory.length === 0) return 0;
+
+    // ユニークな日付を取得してソート
+    const uniqueDates = Array.from(new Set(wearHistory.map((h) => h.date))).sort(
+      (a, b) => new Date(b).getTime() - new Date(a).getTime()
+    );
+
+    if (uniqueDates.length === 0) return 0;
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    // 今日か昨日から始まっていない場合はストリークなし
+    if (uniqueDates[0] !== today && uniqueDates[0] !== yesterday) {
+      return 0;
+    }
+
+    let streak = 1;
+    for (let i = 0; i < uniqueDates.length - 1; i++) {
+      const current = new Date(uniqueDates[i]);
+      const next = new Date(uniqueDates[i + 1]);
+      const diffDays = (current.getTime() - next.getTime()) / (1000 * 60 * 60 * 24);
+
+      if (diffDays === 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  };
+
+  // ストリークからレベルを計算
+  const getLevel = (): number => {
+    const streak = getCurrentStreak();
+    if (streak === 0) return 1;
+    // 7日ごとにレベルアップ、最低1
+    return Math.max(1, Math.floor(streak / 7) + 1);
+  };
+
   return {
     clothes,
     wearHistory,
@@ -373,6 +467,7 @@ export function useCloset() {
     loading,
     error,
     addItem,
+    updateItem,
     deleteItem,
     wearToday,
     removeWearRecord,
@@ -384,9 +479,12 @@ export function useCloset() {
     getLastWornDate,
     getDaysAgo,
     getWearCount,
+    getWearCountInRange,
     isWornToday,
     getCategoryInfo,
     getItemHistory,
+    getCurrentStreak,
+    getLevel,
     refetch: fetchData,
   };
 }

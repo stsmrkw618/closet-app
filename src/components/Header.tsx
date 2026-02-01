@@ -44,7 +44,7 @@ export default function Header({
   showFilters,
 }: HeaderProps) {
   const { signOut } = useAuth();
-  const { getStaleItemCount } = useCloset();
+  const { getStaleItemCount, getLevel, getCurrentStreak } = useCloset();
   const [mascotImage, setMascotImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,6 +71,8 @@ export default function Header({
   };
 
   const staleCount = getStaleItemCount();
+  const level = getLevel();
+  const streak = getCurrentStreak();
 
   return (
     <header className="sticky top-0 z-40 bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800">
@@ -94,22 +96,31 @@ export default function Header({
 
         {/* マスコット＋吹き出し */}
         <div className="flex items-center gap-3 mb-3">
-          {/* マスコットアイコン */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="relative flex-shrink-0 w-11 h-11 rounded-full overflow-hidden border-2 border-emerald-500/40 hover:border-emerald-400 transition-colors bg-zinc-800"
-          >
-            {mascotImage ? (
-              <img src={mascotImage} alt="mascot" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-lg">
-                👤
+          {/* マスコットアイコン + レベル */}
+          <div className="relative flex-shrink-0">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-emerald-500/40 hover:border-emerald-400 transition-colors bg-zinc-800"
+            >
+              {mascotImage ? (
+                <img src={mascotImage} alt="mascot" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-lg">
+                  👤
+                </div>
+              )}
+              <div className="absolute bottom-0 right-0 bg-emerald-500 rounded-full p-0.5">
+                <Upload className="w-2 h-2 text-zinc-950" />
               </div>
-            )}
-            <div className="absolute bottom-0 right-0 bg-emerald-500 rounded-full p-0.5">
-              <Upload className="w-2 h-2 text-zinc-950" />
+            </button>
+            {/* レベルバッジ */}
+            <div
+              className="absolute -bottom-1 -right-1 bg-amber-500 text-zinc-950 text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm"
+              title={`${streak}日連続記録中`}
+            >
+              LV{level}
             </div>
-          </button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"

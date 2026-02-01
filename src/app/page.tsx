@@ -9,6 +9,7 @@ import LoginScreen from '@/components/LoginScreen';
 import Header from '@/components/Header';
 import ClosetView from '@/components/ClosetView';
 import HistoryView from '@/components/HistoryView';
+import RankingView from '@/components/RankingView';
 import AddForm from '@/components/AddForm';
 import DetailView from '@/components/DetailView';
 import BottomNav from '@/components/BottomNav';
@@ -46,6 +47,8 @@ export default function Home() {
       category: CategoryId;
       color: string;
       notes: string;
+      acquired_date?: string;
+      price?: number | null;
     },
     imageFile: File | null
   ) => {
@@ -106,11 +109,15 @@ export default function Home() {
         )}
 
         {view === 'history' && (
-          <HistoryView 
-            clothes={clothes} 
-            wearHistory={wearHistory} 
+          <HistoryView
+            clothes={clothes}
+            wearHistory={wearHistory}
             loading={dataLoading}
           />
+        )}
+
+        {view === 'ranking' && (
+          <RankingView clothes={clothes} loading={dataLoading} />
         )}
 
         {view === 'add' && (

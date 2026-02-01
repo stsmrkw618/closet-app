@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, Calendar, Trash2, X, Loader2, Sparkles } from 'lucide-react';
+import { Clock, Calendar, Trash2, X, Loader2, Sparkles, Tag, CalendarDays, Pencil } from 'lucide-react';
 import { ClothingItem, FreshnessLevel } from '@/types';
 import { useCloset } from '@/hooks/useCloset';
 
@@ -44,6 +44,10 @@ export default function DetailView({ item, onBack, onDelete }: DetailViewProps) 
   const [isDeleting, setIsDeleting] = useState(false);
   const [isWearing, setIsWearing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editAcquiredDate, setEditAcquiredDate] = useState(item.acquired_date || '');
+  const [editPrice, setEditPrice] = useState(item.price?.toString() || '');
+  const [isSaving, setIsSaving] = useState(false);
 
   const {
     getLastWornDate,
@@ -54,6 +58,7 @@ export default function DetailView({ item, onBack, onDelete }: DetailViewProps) 
     wearToday,
     removeWearRecord,
     refreshItem,
+    updateItem,
     getLastRefreshDate,
     getWearsSinceRefresh,
     getFreshnessLevel,
@@ -93,6 +98,27 @@ export default function DetailView({ item, onBack, onDelete }: DetailViewProps) 
     const m = date.getMonth() + 1;
     const d = date.getDate();
     return `${y}/${m}/${d}`;
+  };
+
+  const handleSaveAcquisitionInfo = async () => {
+    setIsSaving(true);
+    await updateItem(item.id, {
+      acquired_date: editAcquiredDate || null,
+      price: editPrice ? parseInt(editPrice, 10) : null,
+    });
+    setIsSaving(false);
+    setIsEditing(false);
+  };
+
+  const formatPrice = (price: number | null): string => {
+    if (price === null) return '未設定';
+    return `¥${price.toLocaleString()}`;
+  };
+
+  const formatAcquiredDate = (dateStr: string | null): string => {
+    if (!dateStr) return '未設定';
+    const date = new Date(dateStr);
+    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
   };
 
   return (
@@ -159,6 +185,67 @@ export default function DetailView({ item, onBack, onDelete }: DetailViewProps) 
             </div>
             <div className="text-lg font-bold">{wearCount}回</div>
           </div>
+        </div>
+
+        {/* Acquisition Info */}
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+            <span className="text-sm font-medium">入手情報</span>
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-zinc-500 hover:text-zinc-300 p-1"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {isEditing ? (
+            <div className="px-4 py-3 space-y-3">
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">手に入れた日</label>
+                <input
+                  type="date"
+                  value={editAcquiredDate}
+                  onChange={(e) => setEditAcquiredDate(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">対価（円）</label>
+                <input
+                  type="number"
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(e.target.value)}
+                  placeholder="例: 3000"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
+              <button
+                onClick={handleSaveAcquisitionInfo}
+                disabled={isSaving}
+                className="w-full bg-emerald-500/20 text-emerald-400 py-2 rounded-lg text-sm font-medium hover:bg-emerald-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : '保存'}
+              </button>
+            </div>
+          ) : (
+            <div className="px-4 py-3 grid grid-cols-2 gap-3">
+              <div>
+                <div className="flex items-center gap-1.5 text-zinc-500 text-xs mb-1">
+                  <CalendarDays className="w-3 h-3" />
+                  手に入れた日
+                </div>
+                <div className="text-sm">{formatAcquiredDate(item.acquired_date)}</div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-zinc-500 text-xs mb-1">
+                  <Tag className="w-3 h-3" />
+                  対価
+                </div>
+                <div className="text-sm">{formatPrice(item.price)}</div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Freshness Section（対象カテゴリのみ表示） */}

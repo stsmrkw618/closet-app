@@ -12,6 +12,8 @@ interface AddFormProps {
       category: CategoryId;
       color: string;
       notes: string;
+      acquired_date?: string;
+      price?: number | null;
     },
     imageFile: File | null
   ) => Promise<void>;
@@ -25,6 +27,8 @@ export default function AddForm({ onAdd, onClose }: AddFormProps) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+  const [acquiredDate, setAcquiredDate] = useState('');
+  const [price, setPrice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,9 +64,19 @@ export default function AddForm({ onAdd, onClose }: AddFormProps) {
     try {
       setIsSubmitting(true);
       setError(null);
-      
-      await onAdd({ name, category, color, notes }, imageFile);
-      
+
+      await onAdd(
+        {
+          name,
+          category,
+          color,
+          notes,
+          acquired_date: acquiredDate || undefined,
+          price: price ? parseInt(price, 10) : null,
+        },
+        imageFile
+      );
+
       // クリーンアップ
       if (imagePreview) {
         URL.revokeObjectURL(imagePreview);
@@ -200,6 +214,31 @@ export default function AddForm({ onAdd, onClose }: AddFormProps) {
             className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 resize-none"
             disabled={isSubmitting}
           />
+        </div>
+
+        {/* Acquired Date & Price */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-zinc-400 mb-2">手に入れた日</label>
+            <input
+              type="date"
+              value={acquiredDate}
+              onChange={(e) => setAcquiredDate(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50"
+              disabled={isSubmitting}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-400 mb-2">対価（円）</label>
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="例: 3000"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50"
+              disabled={isSubmitting}
+            />
+          </div>
         </div>
 
         {/* Submit */}
