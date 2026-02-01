@@ -25,9 +25,9 @@ function getDaysColor(days: number): string {
 }
 
 const FRESHNESS_DOT_STYLES: Record<FreshnessLevel, string> = {
-  fresh: 'bg-emerald-400',
-  moderate: 'bg-amber-400',
-  stale: 'bg-red-400',
+  fresh: 'bg-emerald-400 shadow-emerald-400/50',
+  moderate: 'bg-amber-400 shadow-amber-400/50',
+  stale: 'bg-red-400 shadow-red-400/50',
   hidden: '',
 };
 
@@ -84,8 +84,8 @@ export default function ClothingCard({
         {/* Freshness Dot - 左下（さりげなく） */}
         {freshnessLevel !== 'hidden' && (
           <div
-            className={`absolute bottom-1.5 left-1.5 rounded-full ${FRESHNESS_DOT_STYLES[freshnessLevel]} ${
-              compact ? 'w-2 h-2' : 'w-2.5 h-2.5'
+            className={`absolute bottom-1.5 left-1.5 rounded-full border border-zinc-950/50 shadow-sm ${FRESHNESS_DOT_STYLES[freshnessLevel]} ${
+              compact ? 'w-2.5 h-2.5' : 'w-3 h-3'
             }`}
           />
         )}

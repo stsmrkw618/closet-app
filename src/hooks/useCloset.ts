@@ -59,7 +59,8 @@ export function useCloset() {
       setLoading(true);
       setError(null);
 
-      const [clothesRes, historyRes, refreshRes] = await Promise.all([
+      // 服データ＋着用履歴（必須）
+      const [clothesRes, historyRes] = await Promise.all([
         supabase
           .from('clothes')
           .select('*')
@@ -70,23 +71,31 @@ export function useCloset() {
           .select('*')
           .eq('user_id', user.id)
           .order('date', { ascending: false }),
-        supabase
-          .from('refresh_history')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('refreshed_at', { ascending: false }),
       ]);
 
       if (clothesRes.error) throw clothesRes.error;
       if (historyRes.error) throw historyRes.error;
-      // refresh_historyテーブルが未作成でもエラーにしない
-      if (refreshRes.error && refreshRes.error.code !== '42P01') {
-        console.warn('refresh_history fetch warning:', refreshRes.error);
-      }
 
       setClothes((clothesRes.data as ClothingItem[]) || []);
       setWearHistory((historyRes.data as WearRecord[]) || []);
-      setRefreshHistory((refreshRes.data as RefreshRecord[]) || []);
+
+      // リフレッシュ履歴（テーブル未作成でも他データに影響させない）
+      try {
+        const refreshRes = await supabase
+          .from('refresh_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('refreshed_at', { ascending: false });
+        if (!refreshRes.error) {
+          setRefreshHistory((refreshRes.data as RefreshRecord[]) || []);
+        } else {
+          console.warn('refresh_history not available:', refreshRes.error.message);
+          setRefreshHistory([]);
+        }
+      } catch {
+        console.warn('refresh_history table may not exist yet');
+        setRefreshHistory([]);
+      }
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('データの取得に失敗しました');
@@ -190,11 +199,13 @@ export function useCloset() {
       if (item?.image_url) {
         await deleteImage(item.image_url);
       }
-      // 着用履歴・リフレッシュ履歴も削除
-      await Promise.all([
-        supabase.from('wear_history').delete().eq('clothing_id', id).eq('user_id', user.id),
-        supabase.from('refresh_history').delete().eq('clothing_id', id).eq('user_id', user.id),
-      ]);
+      // 着用履歴削除
+      await supabase.from('wear_history').delete().eq('clothing_id', id).eq('user_id', user.id);
+      // リフレッシュ履歴削除（テーブル未作成でもエラーにしない）
+      try {
+        await supabase.from('refresh_history').delete().eq('clothing_id', id).eq('user_id', user.id);
+      } catch {}
+
       setClothes((prev) => prev.filter((c) => c.id !== id));
       setWearHistory((prev) => prev.filter((h) => h.clothing_id !== id));
       setRefreshHistory((prev) => prev.filter((r) => r.clothing_id !== id));
@@ -273,7 +284,7 @@ export function useCloset() {
       return true;
     } catch (err) {
       console.error('Error recording refresh:', err);
-      setError('リフレッシュ記録の保存に失敗しました');
+      setError('リフレッシュ記録の保存に失敗しました。Supabaseでrefresh_historyテーブルを作成してください。');
       return false;
     }
   };
@@ -301,7 +312,7 @@ export function useCloset() {
   // フレッシュネスレベルを判定
   const getFreshnessLevel = (itemId: string, category: CategoryId): FreshnessLevel => {
     const threshold = FRESHNESS_THRESHOLDS[category];
-    if (!threshold) return 'hidden';
+    if (threshold === null || threshold === undefined) return 'hidden';
 
     const wearsSinceRefresh = getWearsSinceRefresh(itemId);
     if (wearsSinceRefresh < threshold.moderate) return 'fresh';
