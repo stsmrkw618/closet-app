@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { SortDesc, ChevronDown, Shirt, Loader2, Grid3X3, Grid2X2 } from 'lucide-react';
+import { SortDesc, ChevronDown, Shirt, Loader2, Grid2X2, Grid3X3, LayoutGrid } from 'lucide-react';
 import { ClothingItem, CategoryId, SortType } from '@/types';
 import { useCloset } from '@/hooks/useCloset';
 import ClothingCard from './ClothingCard';
+
+type GridSize = 'medium' | 'small' | 'xsmall';
 
 interface ClosetViewProps {
   clothes: ClothingItem[];
@@ -16,8 +18,6 @@ interface ClosetViewProps {
   onAddClick: () => void;
   loading: boolean;
 }
-
-type GridSize = 'medium' | 'small';
 
 function formatDate(date: Date | null): string {
   if (!date) return '未着用';
@@ -57,11 +57,9 @@ export default function ClosetView({
 
   const getFilteredClothes = () => {
     let filtered = [...clothes];
-
     if (filterCategory !== 'all') {
       filtered = filtered.filter((c) => c.category === filterCategory);
     }
-
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -71,14 +69,9 @@ export default function ClosetView({
           c.color?.toLowerCase().includes(q)
       );
     }
-
     filtered.sort((a, b) => {
       if (sortBy === 'lastWorn') {
-        const aDate = getLastWornDate(a.id);
-        const bDate = getLastWornDate(b.id);
-        const aDays = getDaysAgo(aDate);
-        const bDays = getDaysAgo(bDate);
-        return bDays - aDays;
+        return getDaysAgo(getLastWornDate(b.id)) - getDaysAgo(getLastWornDate(a.id));
       } else if (sortBy === 'name') {
         return a.name.localeCompare(b.name);
       } else if (sortBy === 'wearCount') {
@@ -86,7 +79,6 @@ export default function ClosetView({
       }
       return 0;
     });
-
     return filtered;
   };
 
@@ -98,15 +90,10 @@ export default function ClosetView({
     wearCount: '着用回数少ない順',
   };
 
-  const gridConfig = {
-    medium: {
-      className: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4',
-      cardSize: 'medium' as const,
-    },
-    small: {
-      className: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6',
-      cardSize: 'small' as const,
-    },
+  const gridColsClass: Record<GridSize, string> = {
+    medium: 'grid-cols-2 gap-3',
+    small: 'grid-cols-3 gap-2',
+    xsmall: 'grid-cols-4 gap-1.5',
   };
 
   if (loading) {
@@ -154,31 +141,35 @@ export default function ClosetView({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="text-xs text-zinc-500">{filteredClothes.length}件表示</div>
-          
-          {/* Grid Size Toggle */}
-          <div className="flex bg-zinc-900 rounded-lg p-1">
+          <span className="text-xs text-zinc-500">{filteredClothes.length}件</span>
+          {/* グリッドサイズ切替ボタン */}
+          <div className="flex items-center bg-zinc-900 rounded-lg p-0.5 border border-zinc-800">
             <button
               onClick={() => setGridSize('medium')}
-              className={`p-1.5 rounded-md transition-colors ${
-                gridSize === 'medium'
-                  ? 'bg-emerald-500 text-zinc-950'
-                  : 'text-zinc-400 hover:text-zinc-200'
+              className={`p-1.5 rounded transition-colors ${
+                gridSize === 'medium' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-500 hover:text-zinc-300'
               }`}
-              title="中表示"
+              title="2列表示"
             >
               <Grid2X2 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setGridSize('small')}
-              className={`p-1.5 rounded-md transition-colors ${
-                gridSize === 'small'
-                  ? 'bg-emerald-500 text-zinc-950'
-                  : 'text-zinc-400 hover:text-zinc-200'
+              className={`p-1.5 rounded transition-colors ${
+                gridSize === 'small' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-500 hover:text-zinc-300'
               }`}
-              title="小表示"
+              title="3列表示"
             >
               <Grid3X3 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setGridSize('xsmall')}
+              className={`p-1.5 rounded transition-colors ${
+                gridSize === 'xsmall' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+              title="4列表示"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -203,7 +194,7 @@ export default function ClosetView({
           )}
         </div>
       ) : (
-        <div className={`grid gap-2 ${gridConfig[gridSize].className}`}>
+        <div className={`grid ${gridColsClass[gridSize]}`}>
           {filteredClothes.map((item) => {
             const lastWorn = getLastWornDate(item.id);
             const days = getDaysAgo(lastWorn);
@@ -219,7 +210,7 @@ export default function ClosetView({
                 isWornToday={isWornToday(item.id)}
                 onSelect={() => onSelectItem(item)}
                 onWearToday={() => wearToday(item.id)}
-                size={gridConfig[gridSize].cardSize}
+                compact={gridSize === 'xsmall'}
               />
             );
           })}
