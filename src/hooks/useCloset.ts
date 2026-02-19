@@ -232,15 +232,20 @@ export function useCloset() {
   const wearToday = async (clothingId: string): Promise<boolean> => {
     if (!user) return false;
     const today = new Date().toISOString().split('T')[0];
+    return wearOnDate(clothingId, today);
+  };
+
+  const wearOnDate = async (clothingId: string, date: string): Promise<boolean> => {
+    if (!user) return false;
     const existing = wearHistory.find(
-      (h) => h.clothing_id === clothingId && h.date === today
+      (h) => h.clothing_id === clothingId && h.date === date
     );
     if (existing) return true;
     try {
       setError(null);
       const { data, error: insertError } = await supabase
         .from('wear_history')
-        .insert({ user_id: user.id, clothing_id: clothingId, date: today })
+        .insert({ user_id: user.id, clothing_id: clothingId, date })
         .select()
         .single();
       if (insertError) throw insertError;
@@ -469,6 +474,7 @@ export function useCloset() {
     updateItem,
     deleteItem,
     wearToday,
+    wearOnDate,
     removeWearRecord,
     refreshItem,
     getLastRefreshDate,
