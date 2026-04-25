@@ -2,15 +2,27 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    # 毎週 月・木 の UTC 03:00 (JST 12:00) に実行 — 7日非アクティブ停止を防ぐ
-    - cron: '0 3 * * 1,4'
+    # 毎日 UTC 03:00 (JST 12:00) に実行 — Free プランの非アクティブ停止を防ぐ
+    # SELECT 単独では "sufficient activity" 判定を満たさないため PATCH (書き込み) を主に使う
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase REST API
+      - name: Write activity to _keepalive (PATCH)
+        run: |
+          curl --fail --silent --show-error \
+            -X PATCH \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/_keepalive?id=eq.1" \
+            -d "{\"last_ping\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+
+      - name: Read clothes (SELECT) — fallback activity
         run: |
           curl --fail --silent --show-error \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
